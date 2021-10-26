@@ -1,5 +1,5 @@
 from iputils import *
-
+from ipaddress import ip_address, ip_network
 
 class IP:
     def __init__(self, enlace):
@@ -13,6 +13,7 @@ class IP:
         self.enlace.registrar_recebedor(self.__raw_recv)
         self.ignore_checksum = self.enlace.ignore_checksum
         self.meu_endereco = None
+        self.idn = 0
 
     def __raw_recv(self, datagrama):
         dscp, ecn, identification, flags, frag_offset, ttl, proto, \
@@ -28,10 +29,9 @@ class IP:
             self.enlace.enviar(datagrama, next_hop)
 
     def _next_hop(self, dest_addr):
-        # TODO: Use a tabela de encaminhamento para determinar o próximo salto
-        # (next_hop) a partir do endereço de destino do datagrama (dest_addr).
-        # Retorne o next_hop para o dest_addr fornecido.
-        pass
+        matches = [i for i in self.tabela if ip_address(dest_addr) in ip_network(i[0])]
+        if matches:
+            return matches[0][1]
 
     def definir_endereco_host(self, meu_endereco):
         """
@@ -49,9 +49,7 @@ class IP:
         Onde os CIDR são fornecidos no formato 'x.y.z.w/n', e os
         next_hop são fornecidos no formato 'x.y.z.w'.
         """
-        # TODO: Guarde a tabela de encaminhamento. Se julgar conveniente,
-        # converta-a em uma estrutura de dados mais eficiente.
-        pass
+        self.tabela = tabela
 
     def registrar_recebedor(self, callback):
         """
@@ -65,6 +63,15 @@ class IP:
         (string no formato x.y.z.w).
         """
         next_hop = self._next_hop(dest_addr)
-        # TODO: Assumindo que a camada superior é o protocolo TCP, monte o
-        # datagrama com o cabeçalho IP, contendo como payload o segmento.
+        vihl = 4<<4|5
+        dscpecn = 0
+        total_len = 20 + len(segmento)
+        identification = self.idn
+        flagsfrag = 0
+        ttl = 64
+        proto = 6
+        src_addr = self.meu_endereco
+        dest_addr = dest_addr
+        checksum = calc_checksum(struct.pack('!BBHHHBBH', vihl, dscpecn, total_len, identification, flagsfrag, ttl, proto, 0) + str2addr(src_addr) + str2addr(dest_addr))
+        datagrama = struct.pack('!BBHHHBBH', vihl, dscpecn, total_len, identification, flagsfrag, ttl, proto, checksum) + str2addr(src_addr) + str2addr(dest_addr) + segmento 
         self.enlace.enviar(datagrama, next_hop)
