@@ -30,10 +30,20 @@ class IP:
             struct.unpack('!BBHHHBBHII', datagrama[:20])
             ttl -= 1
             if ttl == 0:
-                return
-            checksum = calc_checksum(struct.pack('!BBHHHBBHII', vihl, dscpecn, total_len, identification, flagsfrag, ttl, proto, 0, src_addr, dest_addr))
-            datagrama = struct.pack('!BBHHHBBHII', vihl, dscpecn, total_len, identification, flagsfrag, ttl, proto, checksum, src_addr, dest_addr) + datagrama[20:]
-            self.enlace.enviar(datagrama, next_hop)
+                typ = 11
+                code = 0
+                checksum_icmp = calc_checksum(struct.pack('!BBHI', typ,code,0,0)+datagrama[:28])
+                icmp = struct.pack('!BBHI', typ,code,checksum_icmp,0) + datagrama[:28]
+                next_hop = self._next_hop(src_addr)
+                addr_int = int.from_bytes(str2addr(self.meu_endereco), "big")
+                checksum = calc_checksum(struct.pack('!BBHHHBBHII', vihl, dscpecn, 20+len(icmp), identification, flagsfrag, 64, 1, 0, addr_int, src_addr))
+                datagrama = struct.pack('!BBHHHBBHII', vihl, dscpecn, 20+len(icmp), identification, flagsfrag, 64, 1, checksum, addr_int, src_addr) + icmp
+                self.idn+=1
+                self.enlace.enviar(datagrama, next_hop)
+            else:
+                checksum = calc_checksum(struct.pack('!BBHHHBBHII', vihl, dscpecn, total_len, identification, flagsfrag, ttl, proto, 0, src_addr, dest_addr))
+                datagrama = struct.pack('!BBHHHBBHII', vihl, dscpecn, total_len, identification, flagsfrag, ttl, proto, checksum, src_addr, dest_addr) + datagrama[20:]
+                self.enlace.enviar(datagrama, next_hop)
 
     def _next_hop(self, dest_addr):
         matches = [i for i in self.tabela if ip_address(dest_addr) in ip_network(i[0])]
@@ -75,6 +85,7 @@ class IP:
         dscpecn = 0
         total_len = 20 + len(segmento)
         identification = self.idn
+        self.idn += 1
         flagsfrag = 0
         ttl = 64
         proto = 6
