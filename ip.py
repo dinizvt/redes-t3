@@ -30,6 +30,7 @@ class IP:
 
     def _next_hop(self, dest_addr):
         matches = [i for i in self.tabela if ip_address(dest_addr) in ip_network(i[0])]
+        matches.sort(key=lambda x: ip_network(x[0]).prefixlen, reverse=True)
         if matches:
             return matches[0][1]
 
